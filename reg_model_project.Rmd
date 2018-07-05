@@ -1,0 +1,206 @@
+---
+title: "Modeling and prediction for movies"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+```
+
+### Load data
+
+
+```{r load-data}
+load("movies.Rdata")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+The data described in this project is 651 randomly selected movies which was made and realeased before 2016. This data set uses information from two website https://www.rottentomatoes.com/ and https://www.imdb.com/ for random sampling. Possible source of bias:
+
+Generalizability: As discussed above, 651 randomly selected movies were the main data set. This does capture genelizability with a large number of movies, and this number is probably less than 10% of the total number of movies.
+
+Causality: This is an observational study when each movie is investigated individually with no random assignment used. Hence, no causality can be established.
+
+* * *
+
+## Part 2: Research question
+
+Perform multiple linear regression of imdb_rating:  Rating on IMDB as a function of following parameters: 
+
+title_type: Type of movie (Documentary, Feature Film, TV Movie)
+
+runtime: Runtime of movie, 
+
+thtr_rel_year: Year the movie is released in theaters
+
+imdb_num_votes: Number of votes on IMDB, I transformed it into log10 scale for ease of calculation.
+
+top200_box: Whether or not the movie is in the Top 200 Box Office list on BoxOfficeMojo (no, yes)
+
+audience_rating: Categorical variable for audience rating on Rotten Tomatoes (Spilled, Upright)
+
+critics_rating: Categorical variable for critics rating on Rotten Tomatoes (Certified Fresh, Fresh, Rotten)
+
+This question is of particular interest since we expect that number of vote on IMDB website is a complex function which includes various parameters mentioned above like type of movies, year of movies, rating of movies ... etc. There could be more parameters involved in the model but for simplicity we consider only 7 parameters. 
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+Perform exploratory data analysis for the data of interest.
+```{r}
+load("movies.Rdata")
+movies <- movies %>%
+  filter(!is.na(title_type),!is.na(runtime),!is.na(thtr_rel_year),!is.na(imdb_rating),!is.na(top200_box))
+```
+```{r}
+movies %>%
+  group_by(title_type) %>%
+  summarise(count = n())  %>%
+  filter(!is.na(title_type))
+```
+
+Here, we perform summary statistics of movies by title_type. Although it is not really associated with the linear regression model, it still gives some intuitions of the model.
+
+```{r}
+movies %>%
+   summarise(mean_run=mean(runtime),median_run=median(runtime),min_run=min(runtime),max_run=max(runtime))
+```
+
+EDA of runtime in the data.
+
+```{r}
+movies %>%
+  summarise(meanimdb_rating=mean(imdb_rating),stdimdb_rating=sd(imdb_rating),medianimdb_rating=median(imdb_rating),minimdb_rating=min(imdb_rating),maximdb_rating=max(imdb_rating))
+
+```
+
+EDA of imdb_rating - this is an important result showing mean of the response variable in the linear regression described in the next session.
+
+```{r}
+movies <- movies %>%
+  mutate(log10_votes=log10(imdb_num_votes))
+movies %>%
+  summarise(mean_votes=mean(log10_votes),std_votes=sd(log10_votes),median_votes=median(log10_votes),min_votes=min(log10_votes),max_votes=max(log10_votes))
+
+```
+
+EDA of log10(imdb_num_votes), also plays a role in the multiple variable regression model.
+
+```{r}
+ggplot(data = movies, mapping = aes(x = imdb_rating, fill = title_type)) + geom_histogram()
+
+```
+
+Histogram plot counting the number of votes by genre.
+
+```{r}
+ggplot(data = movies, mapping = aes(x = imdb_rating, fill = audience_rating)) + geom_histogram()
+
+```
+
+Histogram plot counting the number of votes by audience rating.
+
+* * *
+
+## Part 4: Modeling
+
+Step 1: A Trial
+```{r}
+movies <- movies %>%
+  mutate(log10_votes = log10(imdb_num_votes))
+
+ggplot(data = movies, mapping = aes( x = log10_votes, y= imdb_rating)) +
+      geom_jitter() +
+      geom_smooth(method = "lm")
+```
+This is a scatter plot of x=log10(imdb_num_votes) and imdb_rating with associating linear fit. The scatter points seem broad, showing weak linear dependency of this two parameters.
+
+```{r}
+m1 <- lm(imdb_rating ~ log10(imdb_num_votes), movies)
+summary(m1)
+
+```
+
+This section performs single variable regression model imdb_rating as a function of log10(imdb_num_votes), with associating residual plot. The R2 is 0.043.
+
+```{r}
+plot(density(resid(m1))) 
+
+```
+
+This is density plot of residual, showing a nearly normal distribution.
+
+
+```{r}
+qqnorm(resid(m1))
+qqline(resid(m1))
+```
+
+This is quantile normal plot of residual.
+
+
+Multiple regression: We find a more reasonalbe fit to the imdb_rating via many other variables. All the expalanatory parameters seem to be really associated with imdb, whereas other parameters does not have connection with imdb rating. Hence, for simplicity, we choose only 7 parameter model. The parameters of interest are: title_type, runtime, thtr_rel_year, log10(imdb_num_votes), top200_box,audience_rating,critics_rating. For interpretation, please see the question section above.
+
+We choose simple fitting linear model method, used to carry out regression.
+
+```{r}
+movies %>%
+  summarise(cor(imdb_rating,runtime))
+```
+
+Checking the correlation between imdb_rating and runtime: 0.27 which is non-negligble.
+
+
+```{r m_full, tidy = FALSE}
+m_full <- lm(imdb_rating ~ title_type+runtime + thtr_rel_year + log10(imdb_num_votes) + top200_box+audience_rating+critics_rating, data = movies)
+summary(m_full)
+```
+Model diagnostics: highest influential parameters are: title_type (categorical), and audience_rating. There are still some probabilities that top200_box, critics_rating could be eliminated from the model. 
+
+Adjusted R-squared is 0.6397 which is much better than previous single varialbe fit. 
+
+* * *
+
+## Part 5: Prediction
+
+First, we need to create a new data frame for a movie.
+```{r new-prof}
+newmovie <- data.frame(title_type="Feature Film",runtime=94,thtr_rel_year=2008,imdb_num_votes=110000, top200_box="no",audience_rating="Spilled",critics_rating="Fresh")
+```
+
+We take the data for this movie randomly, between max and min of the parameters involved. But the aim is to get a imdb_rating close to its mean or median. The detailed prediction will be presented below.
+
+```{r}
+predict(m1, newmovie)
+```
+Here, we predict imdb_rating of newmovie. We obtain imdb_rating = 6.74, close to the median of imdb_rating.
+
+Predict with confident level:
+```{r}
+predict(m1, newmovie, interval = "prediction", level = 0.95)
+```
+Hence, the model predicts with 95% confident interval that the imdb_rating of newmovie is between 4.66 and 8.83.
+
+
+
+* * *
+
+## Part 6: Conclusion
+
+From the analysis, we conclude that the imdb_rating can be well described a multivariable function of 6 other parameters. Surprisingly, the categorical variable is more influential than numerical variable in our fit. Particularly, the Adjusted R-squared is 0.6397; residual standard error is 0.64. The finding is appropriate for the prediction stated ealier, we do get a resonable fitting model with ajusted R-squared > 0.5. Shortcoming: There is still work for further optimize the model. Some of the probabilities Pr(>|t|) still large: top200_box, critics_rating.

@@ -1,0 +1,125 @@
+---
+title: "Exploring the BRFSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+```
+
+### Load data
+
+```{r load-data}
+load("brfss2013.RData")
+```
+
+
+
+* * *
+
+## Part 1: Data
+The data in Behavioral Risk Factor Surveillance System (BRFSS) project is collected through telephone survey (both handline and cellular phones). It forcuses on non-institutionalized adult popultation over 18. In 50 states across US territories and another locations, a random adult in each household is chosen to give phone interview by questions regarding preventive health practices and risk behaviors that are linked to chronic diseases. The cellular telephone questionnaire is only used when an adult resides in a private residence or college housing.
+
+Scope of inference - generalizability: As discussed above the popolation of interest is non-institutionalized adult over 18. The study does capture generality. Firstly, There is a large number states (50 states and including some more). Secondly, although the interviews are only randomly taken by one person in a household, the finding can be generalized to a the non-institutionalized adults over 18 where the suveys are conducted many times. Random sampling was not used in the questionnaire, since the BRFSS tends to collect uniform, state-specific data.  Some possible sources of bias are non responding due to phone call time, or only one adult in household answers the survey many times.
+
+Scope of inference - causality:  BRFSS is observational exercise - with no explicit random assignments to treatments - all relationships indicated may indication association, but not causation.
+
+* * *
+
+## Part 2: Research questions
+
+**Research quesion 1:**
+Is there any relation between how many hours per week people work and how many days preople feel depressed in past 30 Days? This question is of interest since we are interested in whether people work longer hours feel more depressed during past 30 days.  Perform Exploratory Data Analysis (EDA) of How Many Hours Per Week Do People Work for mean, median, standart deviation, minimum and maximum for this set of data.
+
+There are 2 parameters in this question: qlmentl2 - How Many Days Depressed In Past 30 Days? and scntwrk1 - How Many Hours Per Week Do You Work?
+
+**Research quesion 2:**
+Compare the difference in people who smoke at least 100 cigarettes by races (White, black, asian ..) and sex (Male or Female). Compute total number of male and female who smoke at least 100 cigarettes.
+
+There are 3 parameters in this question:
+smoke100: Smoked At Least 100 Cigarettes
+rrclass2: How Do Other People Usually Classify You In This Country?
+stateres: Resident Of State
+sex: Male or Female
+
+**Research quesion 3:**
+Find the gender difference in general health between people being interviewed in January. This question is interesting because it denotes time dependent interview period of general health in Male and Female, which is closely rerelated to the purpose of the data set. Summarise general health condition (genlth) for people being interviewed in January by genders.
+
+There is 3 parmeters in this question: sex - Male and Female, imonth - interview month which need to be filtered to January only, genhlth - General health.
+* * *
+
+## Part 3: Exploratory data analysis
+
+
+**Research quesion 1:**
+
+```{r}
+load("brfss2013.RData")
+brfss2013 <- brfss2013 %>%
+          filter(!is.na(scntwrk1),!is.na(qlmentl2)) # %>%
+          #mutate(diffgender=as.numeric(menthlth) + as.numeric(physhlth))
+ggplot(data = brfss2013, mapping = aes(x=scntwrk1,y = qlmentl2))+  geom_point(colour="red")
+```
+
+This scatter plot shows relation between scntwrk1 - How Many Hours Per Week Do You Work? and qlmentl2 - How Many Days Depressed In Past 30 Days? To our surprise, the maximum of hours when people feel depressed is around 12 hours, and it is not necessarily working less cause more depression
+```{r}
+
+brfss2013 %>% 
+  filter(!is.na(scntwrk1),!is.na(qlmentl2))  %>%
+  summarise(scntwrk1mean = mean(scntwrk1), scntwrk1median = median(scntwrk1), scntwrk1sd = sd(scntwrk1), scntwrk1min = min(scntwrk1), scntwrk1max = max(scntwrk1))
+```
+Summary statistics of scntwrk1 showing mean, median, standart deviation, min, max.
+
+**Research quesion 2:**
+
+```{r}
+load("brfss2013.RData")
+brfss2013 <- brfss2013 %>%
+           filter(!is.na(smoke100), !is.na(rrclass2), stateres == "Yes")
+#ggplot(data = brfss2013, mapping = aes(rrclass2))+  geom_histogram(stat="count")
+ggplot(data = brfss2013, mapping = aes(rrclass2,fill = smoke100))+  geom_bar(position="fill") + coord_flip() +   facet_grid(sex ~.)
+```
+Figure shows proportion of people who smoke at least 100 cigarettes by races and genders, provided that they are state residences. Here, maximum of count is 1 (100%). As can be seen from the figure, the Asian Male smoke less, and Native Hawaiian or Other Pacific Island Femal almost does not smoke. Meanwhile, While Male and Female smoke most.
+
+```{r}
+load("brfss2013.RData")
+brfss2013 %>% 
+  group_by(smoke100,stateres,rrclass2) %>% 
+  summarise(count = n())  %>%
+  filter(!is.na(smoke100), !is.na(rrclass2), stateres == "Yes")
+
+```
+
+Total number of smoke100 and state residences people by races (rrclass2).
+
+**Research quesion 3:**
+```{r}
+load("brfss2013.RData")
+```
+
+```{r}
+brfss2013 <- brfss2013 %>%
+           filter(imonth == "January",!is.na(sex),!is.na(genhlth))
+ggplot(data = brfss2013, mapping = aes(sex,fill = genhlth))+  geom_bar(position="stack")
+```
+
+Plot shows the gender depndence general health condidion (genlth) of people being interviewed in January. There are 5 possible categories for genhlth: Excellent, Very good, Good, Fair, Poor. The minimum genhlth is poor for both Male a Female (the total number of Male are less than Female). Generally, the people being interview in January possess Very Good or Good health condition.
+
+```{r}
+load("brfss2013.RData")
+brfss2013 %>% 
+  group_by(genhlth,imonth,sex) %>% 
+  summarise(count = n())  %>%
+ filter(!is.na(genhlth),imonth == "January",!is.na(sex))
+```
+
+Summary of general health condition (genlth) for people being interviewed in January by genders. 

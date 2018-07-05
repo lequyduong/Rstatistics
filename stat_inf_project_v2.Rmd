@@ -1,0 +1,88 @@
+---
+title: "Statistical inference with the GSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+```
+
+### Load data
+
+```{r load-data}
+load("gss.Rdata")
+```
+
+
+
+* * *
+
+## Part 1: Data
+GSS data was obtained by face-to-fce interview (vast majority), computer-assisted personal interview (CAPI) (began 2002), or telephone. Source of bias: due to long interview, there are number of people who do not participate in the interviews or do not fully answer the questions.
+
+Scope of inference-generalization: the data consists of 57061 people from American society with random sampling. Hence, this study has generalization.
+
+Scope of inference-causation: this is an observational study and has no causation. Only correlation could be established using statistical inference.
+
+* * *
+
+## Part 2: Research question
+
+Study the difference between hours of watching TV per days for man and woman. This is important question concerning time spent in front of TV for man and woman.
+
+Two parameters needed:
+
+sex: Respondent's sex
+
+tvhours: hours of watching TV per days
+
+* * *
+
+## Part 3: Exploratory data analysis
+EDA and summary statistics.
+
+```{r}
+load("gss.Rdata")
+gss %>%
+group_by(sex,tvhours) %>%
+filter(!is.na(sex),!is.na(tvhours),tvhours != "") %>%
+summarise(count = n()) 
+```
+
+EDA by genders and TV hours.
+
+```{r}
+ggplot(data = gss, mapping = aes(x = sex, y = tvhours)) + geom_boxplot()# +   facet_grid(sex ~.)
+```
+
+This is a box plot showing the gender difference in number of TV hours.
+
+
+* * *
+
+## Part 4: Inference
+
+
+```{r}
+gss <- gss %>%
+       filter(!is.na(tvhours))
+inference(y = tvhours, x = sex, data = gss, statistic = "mean", type = "ci", conf_level = 0.95, method = "theoretical")
+
+```
+
+Inference was performer using mean statistics since we compare the mean of TV hours for male and female, using confident interval test.
+
+Figure shows the gender difference in TV hours. Conclusion from the inference: we are 95% confidence that the mean TVhours of male is smaller then the mean TVhous of female i.e the difference is between (-0.652, -0.1415)
+
+
+
